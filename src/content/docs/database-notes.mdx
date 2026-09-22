@@ -1,0 +1,29 @@
+---
+title: "Per-database notes"
+description: "How each database differs in migrations and behaviour."
+section: Migrations
+order: 4
+---
+
+The schema and query API are the same across databases; a few things about how migrations run are not.
+
+## PostgreSQL and SQLite
+
+Each migration runs in a transaction, together with the bookkeeping row that records it as applied. If a statement fails partway through, everything in that migration rolls back — nothing is left half-applied.
+
+## MySQL
+
+MySQL commits DDL implicitly, so a transaction gives no protection against a partially applied migration: if a statement fails partway through, the earlier statements in the same migration are already committed. The error names which statement failed, so you know exactly how far it got.
+
+`ON DUPLICATE KEY` (used by [upserts](/docs/upserts)) applies to whichever unique key collides, not specifically the columns passed to `OnConflict` — those are only used to read the affected row back afterwards. MySQL also has no `RETURNING`, which is why [UUID defaults](/docs/defaults#uuid-defaults-are-generated-in-go) are generated in Go rather than by the database.
+
+## SQLite
+
+SQLite cannot alter a column's type or add/drop a constraint on an existing table. When a diff needs either, the planner falls back to the documented rebuild procedure: create the new table shape, copy the rows across, drop the old table, rename the new one into place, then recreate its indexes. The migration runner turns foreign key enforcement off around this (the pragma is a no-op inside a transaction anyway) and checks `PRAGMA foreign_key_check` before committing, so a rebuild that would leave a dangling reference fails instead of silently corrupting data.
+
+`VARCHAR(n)` and `DECIMAL(p, s)` are declared but not enforced by SQLite itself — see [Column types](/docs/column-types) for what each type maps to per database, and [Decimal and Money](/docs/column-types#decimal-and-money) for the precision caveat.
+
+## Next
+
+- [Migration workflow](/docs/migrations)
+- [Errors](/docs/errors)

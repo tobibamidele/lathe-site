@@ -1,0 +1,51 @@
+---
+title: "Introduction"
+description: "What lathe is, and how a schema, generated code and migrations fit together."
+section: Getting started
+order: 1
+---
+
+lathe is a schema-first ORM toolchain for Go. You describe your database once, in ordinary Go code, and lathe generates the typed query API and the SQL migrations from that description.
+
+```go
+user, err := client.Users.FindFirst().
+    Where(db.Users.Email.Eq(email), db.Users.Active.Eq(true)).
+    Exclude(db.Users.PasswordHash).
+    One(ctx)
+```
+
+`db.Users.Email` is a `Column[string]`, so `db.Users.Email.Eq(42)` does not compile. There are no struct tags to keep in sync and no column names as strings in your code.
+
+## The three pieces
+
+lathe keeps three things separate, and each command moves information between them.
+
+| Piece | Where it lives | What it means |
+| --- | --- | --- |
+| **Schema** | `schema/schema.go` | What you want the database to look like |
+| **Snapshot** | `migrations/snapshot.json` | What your migration files add up to |
+| **Database** | your PostgreSQL, MySQL or SQLite | What has actually been applied |
+
+```text
+schema.go --> snapshot --+--> lathe generate    --> typed Go code (db/)
+                         |
+                         +--> lathe migrate diff --> up.sql + down.sql --> lathe migrate up --> database
+```
+
+## What you get
+
+- **Typed queries** generated from the schema, with no reflection when reading rows.
+- **Relations** derived from foreign keys, loaded in batches with `With`.
+- **Migrations** with an exact, generated `down` for every `up`.
+- **Upserts, bulk writes and transactions** with savepoints.
+- **PostgreSQL, MySQL and SQLite** from the same schema.
+
+<Callout title="Early release">
+lathe is v0.1. The whole pipeline is implemented and tested against real PostgreSQL, MySQL and SQLite, but the API can still change. See [Limitations](/docs/limitations) for what is not there yet.
+</Callout>
+
+## Next steps
+
+1. [Install lathe](/docs/installation)
+2. Follow the [quickstart](/docs/quickstart)
+3. Learn how to [connect to your database](/docs/connecting)

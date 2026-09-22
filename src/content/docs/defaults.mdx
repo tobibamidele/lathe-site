@@ -1,0 +1,54 @@
+---
+title: "Defaults"
+description: "Constant, now, UUID and expression defaults, and exactly when Create uses them."
+section: Schema
+order: 4
+---
+
+## Kinds of default
+
+```go
+s.Enum("role", "admin", "member").Default("member")   // constant
+s.Bool("active").Default(true)
+s.Int("karma").Default(0)
+s.Timestamp("created_at").DefaultNow()                 // current time
+s.UUID("id").PrimaryKey().DefaultUUID()                // random UUID
+s.Text("slug").DefaultExpr("gen_random_uuid()::text")  // raw SQL, verbatim — not portable across dialects
+```
+
+`Default(v)` accepts strings, bools, integers, floats and anything with a `String()` method (such as `decimal.Decimal`).
+
+## When Create leaves a column out
+
+A Go zero value is sometimes a real value (`false`, `0`), so [`Create`](/docs/writing) never silently replaces one with a constant default. It leaves a column out of the `INSERT` — letting the database fill it in — only when zero means "not set":
+
+- auto increment keys,
+- columns defaulting to `now`, a UUID or an expression,
+- string, enum, time and JSON columns with a constant default, when the field is empty (`Currency: ""` means "use `'USD'`"),
+- **nullable** columns with any default, when the pointer is `nil`.
+
+So a `Bool` column `Active` with `Default(true)` inserts whatever you set — `false` unless you say otherwise — and so does an `Int` column `Karma` with `Default(0)`. To get a bool or number default from the database instead, make the column `Nullable()` and leave the pointer `nil`.
+
+```go
+u := db.User{Email: "ann@example.com", PasswordHash: hash}
+// Role, Active and CreatedAt are all left at their zero value.
+client.Users.Create(ctx, &u)
+// u.Role is now "member", u.Active is whatever the database default is
+// for a *nullable* bool, u.CreatedAt is now.
+```
+
+## UUID defaults are generated in Go
+
+`DefaultUUID()` does not rely on the database. Generated code fills a zero UUID with `uuid.New()` before the row is inserted, whenever the field is still its zero value:
+
+```go
+// generated, do not edit
+Default: func(m *Post) { if m.ID == uuid.Nil { m.ID = uuid.New() } }
+```
+
+This exists because MySQL has no `RETURNING`, so a value the database generated could not be read back afterwards. Generating it in Go means the value is known immediately, on every dialect, and the column keeps its own database default for rows inserted by other tools.
+
+## Next
+
+- [Column types](/docs/column-types)
+- [Writing data](/docs/writing)

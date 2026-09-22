@@ -1,0 +1,67 @@
+---
+title: "Upserts and bulk writes"
+description: "Insert or resolve a conflict, one row or many."
+section: Querying
+order: 6
+---
+
+## Upsert
+
+```go
+err := client.Users.Upsert(&u).
+    OnConflict(db.Users.Email).
+    DoUpdate(db.Users.Name, db.Users.Bio).   // overwrite only these columns
+    Exec(ctx)
+```
+
+| Method | Meaning |
+| --- | --- |
+| `OnConflict(cols...)` | the columns whose uniqueness defines a conflict: a unique index or the primary key |
+| `DoUpdate(cols...)` | overwrite the given columns of the existing row. With no arguments: every inserted column except the conflict columns and the primary key |
+| `DoNothing()` | keep the existing row untouched: a get-or-create |
+| `Set(assignments...)` | arbitrary expressions on conflict, e.g. `lathe.Incr(db.Users.Karma, 1)`. Combines with `DoUpdate`; a column in both takes the `Set` value |
+
+It renders `INSERT ... ON CONFLICT (email) DO UPDATE SET ... = EXCLUDED....` on PostgreSQL and SQLite, and `INSERT ... ON DUPLICATE KEY UPDATE ... = VALUES(...)` on MySQL, where `ON DUPLICATE KEY` applies to whichever unique key collides and the `OnConflict` columns are only used to read the row back afterwards.
+
+After `Exec`, the struct **reflects the database**: the inserted row (with its generated columns filled in), the updated row, or — with `DoNothing` — the row that was already there:
+
+```go
+tag := db.Tag{Name: "go"}
+client.Tags.Upsert(&tag).OnConflict(db.Tags.Name).DoNothing().Exec(ctx)
+// tag now holds whichever row exists, new or pre-existing — a get-or-create in one call.
+```
+
+Columns listed in `DoUpdate` must be part of the `INSERT` — a column left out because it holds its zero value and has a database default (see [Defaults](/docs/defaults#when-create-leaves-a-column-out)) cannot be listed, and `Exec` returns an error if you try.
+
+## UpsertMany
+
+```go
+err := client.Users.UpsertMany(users).
+    OnConflict(db.Users.Email).
+    DoUpdate(db.Users.Name).
+    Exec(ctx)
+```
+
+`Upsert` is `UpsertMany` with one row — both share the same implementation. `UpsertMany`:
+
+- groups rows by which columns they actually insert (some rows might set an explicit `Role`, others rely on its default), so each group gets its own statements,
+- sends multi-row `INSERT` statements sized to the driver's parameter limit,
+- runs everything in **one transaction**, so it is all or nothing,
+- rejects two rows with the **same conflict key** in one call before sending any SQL — PostgreSQL refuses this outright, and on the other databases the outcome would depend on row order.
+
+Every row in the slice is updated in place with what ended up in the database, matched by its `OnConflict` columns rather than by position (`DoNothing` can skip individual rows, which would otherwise break a positional match).
+
+## Performance
+
+Measured locally for 5,000 rows, a mix of inserts and updates:
+
+| | `UpsertMany` | a loop of `Upsert` |
+| --- | --- | --- |
+| PostgreSQL | 150 ms | 2.2 s |
+| MySQL | 220 ms | 3.8 s |
+| SQLite | 65 ms | 0.4 s |
+
+## Next
+
+- [Writing data](/docs/writing)
+- [Transactions](/docs/transactions)

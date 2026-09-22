@@ -1,0 +1,95 @@
+---
+title: "Installation"
+description: "Install the lathe CLI and add lathe to your Go module."
+section: Getting started
+order: 2
+---
+
+## Requirements
+
+- **Go 1.22 or newer**
+- A database: PostgreSQL, MySQL or MariaDB, or SQLite 3.35 or newer
+- A `database/sql` driver for that database (see below). lathe itself depends on none, so you only download the one you use.
+
+## Install the CLI
+
+The `lathe` command generates code and migrations. It is a normal Go program:
+
+```bash
+go install github.com/tobibamidele/lathe/cmd/lathe@latest
+```
+
+Check that it is on your `PATH`:
+
+```bash
+lathe version
+```
+
+<Callout title="lathe: command not found?">
+`go install` puts binaries in `$(go env GOBIN)`, or `$(go env GOPATH)/bin` when that is empty. Add that directory to your `PATH`.
+</Callout>
+
+## Add lathe to your module
+
+Run this inside your Go module, next to `go.mod`. It adds the runtime that generated code imports:
+
+```bash
+go get github.com/tobibamidele/lathe@latest
+```
+
+## Install a database driver
+
+Import the driver for your database and lathe finds it automatically.
+
+<Tabs labels={['PostgreSQL', 'MySQL', 'SQLite']}>
+<Tab>
+
+```bash
+go get github.com/jackc/pgx/v5        # import _ "github.com/jackc/pgx/v5/stdlib"
+# or
+go get github.com/lib/pq              # import _ "github.com/lib/pq"
+```
+
+</Tab>
+<Tab>
+
+```bash
+go get github.com/go-sql-driver/mysql  # import _ "github.com/go-sql-driver/mysql"
+```
+
+</Tab>
+<Tab>
+
+```bash
+go get modernc.org/sqlite              # pure Go, import _ "modernc.org/sqlite"
+# or
+go get github.com/mattn/go-sqlite3     # needs cgo, import _ "github.com/mattn/go-sqlite3"
+```
+
+</Tab>
+</Tabs>
+
+## Optional modules
+
+Generated code imports two small modules when your schema uses the matching column types. `lathe generate` tells you if your `go.mod` is missing them:
+
+| Column type | Module |
+| --- | --- |
+| `Decimal`, `Money` | `github.com/shopspring/decimal` |
+| `UUID` | `github.com/google/uuid` |
+
+```bash
+go get github.com/shopspring/decimal github.com/google/uuid
+```
+
+## Build from source
+
+```bash
+git clone https://github.com/tobibamidele/lathe
+cd lathe
+make install
+```
+
+## Next
+
+Continue with the [quickstart](/docs/quickstart), or read how to [connect](/docs/connecting).

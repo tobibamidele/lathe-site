@@ -1,0 +1,51 @@
+---
+title: "Errors"
+description: "The errors lathe returns and how to test for them."
+section: Debugging
+order: 2
+---
+
+## Sentinel errors
+
+Test for these with `errors.Is`:
+
+| Error | When |
+| --- | --- |
+| `lathe.ErrNotFound` | `Get`, `FindFirst().One`, `ScanOne`, `RawOne` or `Save` found no matching row. Also matches `sql.ErrNoRows`. |
+| `lathe.ErrUniqueViolation` | a unique or primary key constraint was violated |
+| `lathe.ErrForeignKeyViolation` | a foreign key constraint was violated |
+| `lathe.ErrNotNullViolation` | a `NOT NULL` constraint was violated |
+| `lathe.ErrCheckViolation` | a `CHECK` constraint was violated (for example, an invalid enum value) |
+| `lathe.ErrMissingWhere` | an `Update` or `Delete` had no `Where` and no `.AllRows()` |
+
+```go
+err := client.Users.Create(ctx, &dup)
+if errors.Is(err, lathe.ErrUniqueViolation) {
+    // the email is already taken
+}
+
+_, err = client.Users.Get(ctx, missingID)
+if errors.Is(err, lathe.ErrNotFound) {
+    // no such user
+}
+```
+
+## Reaching the underlying driver error
+
+Classified errors wrap the original driver error, so `errors.As` still reaches it if you need driver-specific detail beyond what the sentinel tells you:
+
+```go
+var pgErr *pgconn.PgError
+if errors.As(err, &pgErr) {
+    fmt.Println(pgErr.ConstraintName)
+}
+```
+
+## How classification works
+
+Each dialect maps its own error format to one of the sentinels above: PostgreSQL by `SQLSTATE` code, MySQL by numeric error code, SQLite by matching the driver's error message (which is stable across the common SQLite drivers). A driver error that doesn't match a known constraint failure is returned unwrapped.
+
+## Next
+
+- [Logging and tracing](/docs/logging-and-tracing)
+- [Troubleshooting](/docs/troubleshooting)

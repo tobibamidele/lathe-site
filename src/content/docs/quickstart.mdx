@@ -1,0 +1,91 @@
+---
+title: "Quickstart"
+description: "From an empty Go module to a typed client, a migration and your first query."
+section: Getting started
+order: 3
+---
+
+This takes a few minutes. It assumes you have [installed lathe](/docs/installation) and have a Go module.
+
+## 1. Scaffold a schema
+
+```bash
+lathe init --dialect postgres
+```
+
+This writes `schema/schema.go` and adds `_lathe/` to `.gitignore`. Use `sqlite` or `mysql` instead of `postgres` for those databases.
+
+## 2. Describe your tables
+
+The schema is ordinary Go, so you get autocomplete and compile errors. Edit `schema/schema.go`:
+
+```go
+package schema
+
+import s "github.com/tobibamidele/lathe/schema"
+
+var Schema = s.New(s.Config{
+    Dialect:    s.Postgres,
+    Output:     "db",          // the generated package
+    Migrations: "migrations",  // SQL files and the schema snapshot
+},
+    s.Table("users",
+        s.BigInt("id").PrimaryKey().AutoIncrement(),
+        s.VarChar("email", 255).Unique(),
+        s.Text("password_hash"),
+        s.Text("bio").Nullable(),
+        s.Enum("role", "admin", "member").Default("member"),
+        s.Timestamp("created_at").DefaultNow(),
+    ),
+)
+```
+
+Columns are `NOT NULL` unless you call `.Nullable()`.
+
+## 3. Generate the Go package
+
+```bash
+lathe generate
+```
+
+You now have a `db` package with a struct per table, typed columns and a client.
+
+## 4. Create and apply a migration
+
+```bash
+lathe migrate diff init
+lathe migrate up --url "$DATABASE_URL"
+```
+
+`diff` writes an `up` and a `down` migration into `migrations/`. Read them before you apply them. Add `--dry-run` to print the SQL without writing files.
+
+## 5. Run a query
+
+```go
+conn, err := postgres.Open(os.Getenv("DATABASE_URL"))
+if err != nil {
+    log.Fatal(err)
+}
+client := db.NewClient(conn)
+
+u := db.User{Email: "ann@example.com", PasswordHash: hash}
+if err := client.Users.Create(ctx, &u); err != nil {
+    log.Fatal(err)
+}
+// u.ID, u.Role and u.CreatedAt are filled in from the database.
+
+user, err := client.Users.FindFirst().
+    Where(db.Users.Email.Eq("ann@example.com")).
+    Exclude(db.Users.PasswordHash).
+    One(ctx)
+```
+
+<Callout title="Change the schema later">
+Edit `schema/schema.go`, then run `lathe generate` and `lathe migrate diff <name>` again. Renaming a column or table needs an explicit hint: see [Renames and manual migrations](/docs/renames).
+</Callout>
+
+## Where next
+
+- [Connect](/docs/connecting) to PostgreSQL, MySQL or SQLite
+- [Read data](/docs/reading) and [write data](/docs/writing)
+- Understand the [migration workflow](/docs/migrations)

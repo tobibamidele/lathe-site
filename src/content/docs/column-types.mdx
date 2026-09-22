@@ -1,0 +1,110 @@
+---
+title: "Column types"
+description: "Every column builder, its Go type and its SQL type on each database."
+section: Schema
+order: 2
+---
+
+Each builder below is a function in the `schema` package (conventionally imported as `s`), used inside `s.Table(...)`.
+
+## The mapping
+
+| Builder | Go type | PostgreSQL | MySQL | SQLite |
+| --- | --- | --- | --- | --- |
+| `SmallInt` / `Int` / `BigInt` | `int16` / `int32` / `int64` | `SMALLINT` / `INTEGER` / `BIGINT` | `SMALLINT` / `INT` / `BIGINT` | `INTEGER` |
+| `Real` / `Double` | `float32` / `float64` | `REAL` / `DOUBLE PRECISION` | `FLOAT` / `DOUBLE` | `REAL` |
+| `Decimal(p, s)` | `decimal.Decimal` | `NUMERIC(p,s)` | `DECIMAL(p,s)` | `DECIMAL(p,s)` (numeric affinity) |
+| `Money` | `decimal.Decimal` | `NUMERIC(19,4)` | `DECIMAL(19,4)` | `DECIMAL(19,4)` |
+| `Bool` | `bool` | `BOOLEAN` | `BOOLEAN` | `BOOLEAN` |
+| `VarChar(n)` | `string` | `VARCHAR(n)` | `VARCHAR(n)` | `TEXT` |
+| `Text` | `string` | `TEXT` | `TEXT` | `TEXT` |
+| `UUID` | `uuid.UUID` | `UUID` | `CHAR(36)` | `TEXT` |
+| `Timestamp` | `time.Time` | `TIMESTAMPTZ` | `DATETIME(6)` | `DATETIME` |
+| `Date` | `time.Time` | `DATE` | `DATE` | `DATE` |
+| `JSON` | `lathe.JSON` | `JSONB` | `JSON` | `TEXT` |
+| `Bytes` | `[]byte` | `BYTEA` | `LONGBLOB` | `BLOB` |
+| `Enum(v...)` | generated named `string` type | `TEXT` + `CHECK` | `ENUM(...)` | `TEXT` + `CHECK` |
+
+`VarChar` and `Decimal` take arguments (`s.VarChar("email", 255)`, `s.Decimal("amount", 20, 4)`); every other builder takes only a column name.
+
+## Nullable columns
+
+Columns are `NOT NULL` by default. `.Nullable()` allows `NULL`, and the generated struct field becomes a pointer:
+
+```go
+s.Text("bio").Nullable()
+```
+
+```go
+Bio *string `db:"bio" json:"bio"`
+```
+
+In queries, use `IsNull()` and `IsNotNull()` to filter, and `Column.SetNull()` in an `Update` to clear a value. See [Conditions](/docs/conditions) and [Writing data](/docs/writing).
+
+## Enums
+
+```go
+s.Enum("role", "admin", "editor", "reader").Default("reader")
+```
+
+lathe generates a named string type with one constant per value:
+
+```go
+type UserRole string
+
+const (
+    UserRoleAdmin  UserRole = "admin"
+    UserRoleEditor UserRole = "editor"
+    UserRoleReader UserRole = "reader"
+)
+```
+
+The database enforces the same set: `ENUM(...)` on MySQL, and `TEXT` with a `CHECK` constraint on PostgreSQL and SQLite (which have no native enum type lathe uses).
+
+## JSON
+
+```go
+s.JSON("settings").Nullable()
+```
+
+generates a `lathe.JSON` field ([`[]byte`](/docs/type-mapping) under the hood):
+
+```go
+settings, err := lathe.NewJSON(map[string]any{"theme": "dark"})
+u.Settings = settings
+...
+var m map[string]any
+err = u.Settings.Decode(&m)
+```
+
+A `nil` `lathe.JSON` stores SQL `NULL`.
+
+## UUID
+
+```go
+s.UUID("id").PrimaryKey().DefaultUUID()
+```
+
+generates a `uuid.UUID` field ([`github.com/google/uuid`](https://pkg.go.dev/github.com/google/uuid)). `DefaultUUID()` fills a zero UUID with `uuid.New()` in Go before the row is inserted — see [Defaults](/docs/defaults) for why this happens client-side rather than in the database.
+
+## Decimal and Money
+
+```go
+s.Decimal("amount", 20, 4)   // precision, scale
+s.Money("total")             // shorthand for Decimal(name, 19, 4)
+```
+
+Both generate a `decimal.Decimal` field ([`github.com/shopspring/decimal`](https://pkg.go.dev/github.com/shopspring/decimal)), exact on PostgreSQL and MySQL. SQLite has no exact numeric type: values are stored with `NUMERIC` affinity, which is exact for roughly 15 significant digits. Keep a currency in its own column — there is no built-in `Money` struct with a currency, on purpose.
+
+## Bytes
+
+```go
+s.Bytes("cover").Nullable()
+```
+
+generates a plain `[]byte` field.
+
+## Next
+
+- [Keys, indexes and foreign keys](/docs/keys-and-indexes)
+- [Defaults](/docs/defaults)

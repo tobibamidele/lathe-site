@@ -1,0 +1,86 @@
+---
+title: "Joins and aggregates"
+description: "Free-form SELECT with joins, grouping, aggregates and subqueries."
+section: Querying
+order: 4
+---
+
+`FindMany` reads rows of a single table. For joins, grouping and aggregates, use the free-form `Select` builder together with `lathe.Scan`.
+
+## The Select builder
+
+```go
+type stat struct {
+    Email string
+    Posts int64
+}
+rows, err := lathe.Scan[stat](ctx, client.DB,
+    lathe.Select(db.Users.Email, lathe.Count(db.Posts.ID).As("posts")).
+        From(db.Users).
+        LeftJoin(db.Posts, db.Posts.AuthorID.EqCol(db.Users.ID)).
+        GroupBy(db.Users.Email).
+        Having(lathe.Count(db.Posts.ID).Gt(0)).
+        OrderBy(lathe.Count(db.Posts.ID).Desc()))
+```
+
+`Select` takes any number of columns, aliased expressions or aggregate calls. `From` sets the primary table; `Join` and `LeftJoin` add more, each with an `On` condition (built the same way as a `Where` condition — see [Conditions](/docs/conditions)). `GroupBy`, `Having`, `OrderBy`, `Limit`, `Offset` and `Distinct` all read the way they do in SQL.
+
+## Scanning results
+
+`lathe.Scan[T]` runs a `Select` query and scans every row into `T`, matching result columns to struct fields by their `db` tag or, failing that, by name — case and underscores ignored, so a column aliased `total_paid` fills a field named `TotalPaid`. A result column with no matching field is an error rather than a silently dropped value.
+
+`lathe.ScanOne[T]` is the same but returns the first row, or `lathe.ErrNotFound` when there are none:
+
+```go
+one, err := lathe.ScanOne[stat](ctx, client.DB,
+    lathe.Select(db.Users.Email, lathe.CountAll().As("posts")).
+        From(db.Users).Where(db.Users.Email.Eq(email)).GroupBy(db.Users.Email))
+```
+
+Scanning into a single scalar type (`int64`, `string`, ...) works for queries that select exactly one column:
+
+```go
+ids, err := lathe.Scan[int64](ctx, client.DB,
+    lathe.Select(db.Users.ID).From(db.Users).Where(db.Users.Active.Eq(true)))
+```
+
+## Aggregates
+
+```go
+lathe.CountAll()             // COUNT(*)
+lathe.Count(col)             // COUNT(col)
+lathe.CountDistinct(col)     // COUNT(DISTINCT col)
+lathe.Sum(col)
+lathe.Avg(col)
+lathe.Min(col)
+lathe.Max(col)
+lathe.Coalesce(col, fallback)
+```
+
+Every aggregate has `.As("alias")` for the select list, and `.Asc()`/`.Desc()` so it can be used directly in `OrderBy`, as in the example above.
+
+## Subqueries
+
+```go
+published := lathe.Select(db.Posts.AuthorID).From(db.Posts).Where(db.Posts.Status.Eq(db.PostStatusPublished))
+
+authors, err := lathe.Scan[string](ctx, client.DB,
+    lathe.Select(db.Users.Name).From(db.Users).
+        Where(db.Users.ID.InQuery(published)).
+        OrderBy(db.Users.Name.Asc()))
+```
+
+`col.InQuery(subquery)` renders `col IN (subquery)`. `lathe.Exists(subquery)` renders `EXISTS (subquery)`, typically combined with a correlated condition referencing the outer query's table:
+
+```go
+commented := lathe.Select(lathe.SQL("1")).From(db.Comments).
+    Where(db.Comments.PostID.EqCol(db.Posts.ID))
+
+titles, err := lathe.Scan[string](ctx, client.DB,
+    lathe.Select(db.Posts.Title).From(db.Posts).Where(lathe.Exists(commented)))
+```
+
+## Next
+
+- [Conditions](/docs/conditions)
+- [Relations and preloading](/docs/relations) — for the common case of "this row's related rows", without hand-writing a join

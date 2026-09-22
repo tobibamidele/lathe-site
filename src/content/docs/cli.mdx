@@ -1,0 +1,75 @@
+---
+title: "CLI reference"
+description: "Every lathe command and its flags."
+section: Reference
+order: 1
+---
+
+All commands are run from inside your Go module. Flags can appear before or after positional arguments.
+
+## lathe init
+
+```bash
+lathe init [--dialect postgres|mysql|sqlite] [--schema DIR]
+```
+
+Scaffolds a schema package. `--dialect` defaults to `postgres`; `--schema` defaults to `schema`.
+
+## lathe generate
+
+```bash
+lathe generate [--schema DIR]
+```
+
+Generates the Go package (models, typed columns, client) from the schema. Only rewrites files whose content actually changed, and removes generated files for tables that no longer exist.
+
+## lathe migrate diff
+
+```bash
+lathe migrate diff [NAME] [--schema DIR] [--dry-run]
+```
+
+Writes a migration for the difference between the current schema and the last snapshot, plus its down migration. `--dry-run` prints the SQL instead of writing files. `NAME` defaults to `changes` if omitted.
+
+## lathe migrate new
+
+```bash
+lathe migrate new NAME
+```
+
+Creates an empty migration pair for hand-written SQL.
+
+## lathe migrate snapshot
+
+```bash
+lathe migrate snapshot [--schema DIR]
+```
+
+Records the current schema as the snapshot without writing a migration — use after a hand-written migration brings the database in line with the schema.
+
+## lathe migrate up / down / status
+
+```bash
+lathe migrate up     [--steps N] [--url URL] [--schema DIR]
+lathe migrate down   [--steps N] [--url URL] [--schema DIR]
+lathe migrate status [--url URL] [--schema DIR]
+```
+
+Apply, revert or list migrations. `--url` defaults to `$DATABASE_URL`. `up` with no `--steps` applies everything pending; `down` with no `--steps` reverts one migration.
+
+## lathe version
+
+```bash
+lathe version
+```
+
+Prints the CLI version.
+
+## Exit codes
+
+`0` on success, `1` on any error (a failed command prints its error to stderr).
+
+## Next
+
+- [Migration workflow](/docs/migrations)
+- [Defining a schema](/docs/schema)

@@ -1,0 +1,31 @@
+---
+title: "Type mapping"
+description: "Column builders mapped to Go types and to each database."
+section: Reference
+order: 2
+---
+
+| Builder | Go type | PostgreSQL | MySQL | SQLite |
+| --- | --- | --- | --- | --- |
+| `SmallInt` / `Int` / `BigInt` | `int16` / `int32` / `int64` | `SMALLINT` / `INTEGER` / `BIGINT` | `SMALLINT` / `INT` / `BIGINT` | `INTEGER` |
+| `Real` / `Double` | `float32` / `float64` | `REAL` / `DOUBLE PRECISION` | `FLOAT` / `DOUBLE` | `REAL` |
+| `Decimal(p, s)` | `decimal.Decimal` | `NUMERIC(p,s)` | `DECIMAL(p,s)` | `DECIMAL(p,s)` (numeric affinity) |
+| `Money` | `decimal.Decimal` | `NUMERIC(19,4)` | `DECIMAL(19,4)` | `DECIMAL(19,4)` |
+| `Bool` | `bool` | `BOOLEAN` | `BOOLEAN` | `BOOLEAN` |
+| `VarChar(n)` | `string` | `VARCHAR(n)` | `VARCHAR(n)` | `TEXT` |
+| `Text` | `string` | `TEXT` | `TEXT` | `TEXT` |
+| `UUID` | `uuid.UUID` | `UUID` | `CHAR(36)` | `TEXT` |
+| `Timestamp` | `time.Time` | `TIMESTAMPTZ` | `DATETIME(6)` | `DATETIME` |
+| `Date` | `time.Time` | `DATE` | `DATE` | `DATE` |
+| `JSON` | `lathe.JSON` | `JSONB` | `JSON` | `TEXT` |
+| `Bytes` | `[]byte` | `BYTEA` | `LONGBLOB` | `BLOB` |
+| `Enum(v...)` | generated named `string` type | `TEXT` + `CHECK` | `ENUM(...)` | `TEXT` + `CHECK` |
+
+A `.Nullable()` column's Go type becomes a pointer to the type above (`*string`, `*int32`, ...), except `lathe.JSON`, which is already nil-able.
+
+Full explanation of each type, including enums, JSON and decimals, is in [Column types](/docs/column-types).
+
+## Next
+
+- [Column types](/docs/column-types)
+- [Defaults](/docs/defaults)

@@ -1,0 +1,51 @@
+---
+title: "Logging and tracing"
+description: "See every statement lathe sends and preview the SQL before it runs."
+section: Debugging
+order: 1
+---
+
+## WithLogger
+
+`lathe.WithLogger` is an option to `postgres.Open`, `mysql.Open`, `sqlite.Open` or `*.New`. The callback runs after every statement, whether it came from a query builder, a relation load, or raw SQL:
+
+```go
+type QueryEvent struct {
+    SQL      string
+    Args     []any
+    Duration time.Duration
+    Err      error
+}
+
+conn, err := postgres.Open(dsn, lathe.WithLogger(func(ctx context.Context, e lathe.QueryEvent) {
+    slog.DebugContext(ctx, "sql", "query", e.SQL, "args", e.Args, "took", e.Duration, "err", e.Err)
+}))
+```
+
+This is also how you can confirm [preloading](/docs/relations) is actually batching rather than issuing one query per row — count the statements a request produces and assert it stays constant as the number of rows grows:
+
+```go
+var statements int
+conn, _ := postgres.Open(dsn, lathe.WithLogger(func(_ context.Context, _ lathe.QueryEvent) {
+    statements++
+}))
+...
+users, _ := client.Users.FindMany().With(db.Users.Posts, db.Users.Profile).All(ctx)
+// statements is 1 (users) + 1 (posts) + 1 (profile) = 3, regardless of len(users).
+```
+
+## Preview SQL without running it
+
+Every query builder has a `Build()` that renders the statement and its arguments without executing anything:
+
+```go
+sqlText, args, err := client.Users.FindMany().Where(db.Users.Active.Eq(true)).Build()
+sqlText, args, err = client.Users.Upsert(&u).OnConflict(db.Users.Email).DoUpdate().Build()
+```
+
+`lathe migrate diff --dry-run` does the same thing for migrations — prints the SQL a diff would produce without writing any files. See [Migration workflow](/docs/migrations#generate-a-migration).
+
+## Next
+
+- [Errors](/docs/errors)
+- [Troubleshooting](/docs/troubleshooting)

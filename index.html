@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>lathe: a schema-first ORM toolchain for Go</title>
+    <meta
+      name="description"
+      content="Describe your database once in Go. lathe generates typed queries, relations and SQL migrations for PostgreSQL, MySQL and SQLite."
+    />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content="lathe" />
+    <meta property="og:description" content="A schema-first ORM toolchain for Go." />
+    <meta property="og:type" content="website" />
+    <!-- Apply the saved theme before first paint so there is no flash. Dark is the default. -->
+    <script>
+      try {
+        var t = localStorage.getItem('theme')
+        document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'
+      } catch (e) {
+        document.documentElement.dataset.theme = 'dark'
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

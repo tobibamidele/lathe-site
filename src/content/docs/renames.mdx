@@ -1,0 +1,46 @@
+---
+title: "Renames and manual migrations"
+description: "Tell lathe about renames, and write SQL by hand when needed."
+section: Migrations
+order: 2
+---
+
+## Why lathe never guesses a rename
+
+A diff that sees a column named `title` disappear and a column named `headline` appear cannot tell whether that is a rename or a drop-and-add. Guessing wrong destroys data, so lathe never guesses — it needs an explicit hint.
+
+## RenamedFrom
+
+```go
+s.Table("posts",
+    s.VarChar("headline", 300).RenamedFrom("title"),
+    ...
+).RenamedFrom("articles")   // tables can be renamed too
+```
+
+Run `lathe migrate diff`, review the generated `ALTER TABLE ... RENAME COLUMN` (or `RENAME TO`), then **remove the `RenamedFrom` calls** — they are a one-time instruction for the next diff, not a permanent part of the schema. A stale hint (one whose old name no longer matches anything) is ignored, so it is safe to forget to remove it immediately; it just becomes a no-op on the following diff.
+
+## Hand-written migrations
+
+For a change the diff cannot express — data backfills, a `CREATE INDEX CONCURRENTLY`, anything you'd rather write yourself — create an empty migration pair and fill it in:
+
+```bash
+lathe migrate new backfill_slugs
+```
+
+This writes `<timestamp>_backfill_slugs.up.sql` and `.down.sql` with no content. After writing the SQL, if the schema now matches what you wrote (as it does for most hand-written structural changes), tell lathe so the next diff doesn't see it as an outstanding change:
+
+```bash
+lathe migrate snapshot
+```
+
+`migrate snapshot` records the current schema without writing a migration file.
+
+## Primary key changes
+
+Changing a table's primary key is refused, with an error explaining why: it cannot be done safely without knowing your data (what should happen to existing rows' identity, to foreign keys pointing at the old key, and so on). Use `migrate new` to write it by hand, then `migrate snapshot`.
+
+## Next
+
+- [Migration workflow](/docs/migrations)
+- [Running migrations from your app](/docs/run-in-your-app)

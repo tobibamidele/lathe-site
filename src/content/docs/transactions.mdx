@@ -1,0 +1,59 @@
+---
+title: "Transactions"
+description: "Commit, rollback, savepoints and isolation levels."
+section: Querying
+order: 7
+---
+
+## client.Tx
+
+```go
+err := client.Tx(ctx, func(tx *db.Client) error {
+    if err := tx.Users.Create(ctx, &u); err != nil {
+        return err          // rolls back
+    }
+    return tx.Posts.Create(ctx, &p)   // commits when this returns nil
+})
+```
+
+The transaction commits when the callback returns `nil`, and rolls back if it returns an error or panics (the panic is re-raised after the rollback). Use the `*db.Client` passed into the callback — `tx`, not the outer `client` — for every statement that belongs to the transaction.
+
+## Nested transactions are savepoints
+
+Calling `.Tx` again from inside a transaction creates a savepoint rather than a new transaction:
+
+```go
+err := client.Tx(ctx, func(tx *db.Client) error {
+    if err := tx.Users.Create(ctx, &a); err != nil {
+        return err
+    }
+    inner := tx.Tx(ctx, func(tx2 *db.Client) error {
+        return tx2.Users.Create(ctx, &dup)   // say this hits a unique violation
+    })
+    if errors.Is(inner, lathe.ErrUniqueViolation) {
+        // only the inner work rolled back; tx is still healthy here
+    }
+    return tx.Users.Create(ctx, &c)
+})
+```
+
+An error inside the inner callback rolls back only that savepoint — the outer transaction is unaffected and can keep going, as shown above.
+
+## Isolation and read-only
+
+`TxOptions` is `Tx` with an explicit `*sql.TxOptions`:
+
+```go
+err := client.TxOptions(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: true},
+    func(tx *db.Client) error {
+        n, err := tx.Posts.Count(ctx)
+        return err
+    })
+```
+
+Isolation and read-only settings apply to the top-level transaction; a nested `.Tx` call (a savepoint) ignores them, since a savepoint runs inside the isolation level its enclosing transaction already established.
+
+## Next
+
+- [Writing data](/docs/writing)
+- [Upserts and bulk writes](/docs/upserts)

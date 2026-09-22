@@ -1,0 +1,95 @@
+---
+title: "Defining a schema"
+description: "Describe tables and columns in Go, and how lathe reads them."
+section: Schema
+order: 1
+---
+
+Your schema is a Go value, conventionally in `schema/schema.go`:
+
+```go
+package schema
+
+import s "github.com/tobibamidele/lathe/schema"
+
+var Schema = s.New(s.Config{
+    Dialect:    s.Postgres,
+    Output:     "db",          // the generated package
+    Migrations: "migrations",  // SQL files and the schema snapshot
+},
+    s.Table("users",
+        s.BigInt("id").PrimaryKey().AutoIncrement(),
+        s.VarChar("email", 255).Unique(),
+        s.Text("bio").Nullable(),
+        s.Enum("role", "admin", "member").Default("member"),
+        s.Timestamp("created_at").DefaultNow(),
+    ),
+)
+```
+
+`lathe generate` and `lathe migrate diff` both need to find this value, so it must be exported and named `Schema`.
+
+## How lathe reads it
+
+There is no parser: lathe writes a small throwaway program inside your module that imports your schema package, calls `Schema.Export()`, and prints the result as JSON. That program is compiled and run with `go run`, so your `go.mod` resolves every import exactly as it would for your own code, and the schema gets full type checking, autocomplete and compile errors along the way.
+
+`Export()` also validates the schema and normalises it (sorts tables, derives deterministic index and constraint names). If validation fails, every problem is reported together rather than one at a time.
+
+## Config
+
+```go
+type Config struct {
+    Dialect    Dialect // s.Postgres, s.MySQL or s.SQLite — required
+    Output     string  // generated package directory, default "db"
+    Package    string  // generated package name, default the last element of Output
+    Migrations string  // migrations directory, default "migrations"
+    Driver     string  // import path lathe links for `migrate up/down`, e.g. "github.com/lib/pq"
+}
+```
+
+## Tables and columns
+
+`s.Table(name, ...items)` takes column builders, index builders, and foreign key builders — see [Column types](/docs/column-types) and [Keys, indexes and foreign keys](/docs/keys-and-indexes) for the full set. Columns are `NOT NULL` unless you call `.Nullable()`.
+
+```go
+s.Table("posts",
+    s.UUID("id").PrimaryKey().DefaultUUID(),
+    s.BigInt("author_id").References("users", "id").OnDelete(s.Cascade),
+    s.VarChar("title", 200),
+)
+```
+
+Two names can be overridden per table or column when the derived one is not what you want:
+
+- `.Model("Name")` on a table overrides the generated Go struct name (default: a singularised, PascalCase version of the table name).
+- `.Field("Name")` on a column overrides the generated struct field name (default: PascalCase of the column name, with common initialisms like `ID` and `URL` capitalised).
+
+## Conditional schemas
+
+Because the schema is Go, you can use ordinary control flow. `TableBuilder.Add(...)` appends more items to a table already under construction, which is useful for schemas that vary — for example a set of columns only present in one deployment, or a schema built from a shared list of tables per environment:
+
+```go
+users := s.Table("users",
+    s.BigInt("id").PrimaryKey().AutoIncrement(),
+    s.VarChar("email", 255).Unique(),
+)
+if withProfiles {
+    users.Add(s.Text("bio").Nullable())
+}
+```
+
+## Validation
+
+Every schema is checked before it is used for anything. Problems are collected and reported together — you fix a batch, not one error at a time. Checks include:
+
+- every table has a primary key, and `AutoIncrement()` is used on exactly the primary key column
+- a foreign key's referenced table and columns exist, and their types match
+- a foreign key's referenced columns are that table's primary key or a unique index
+- column and table names are valid identifiers and fit inside 63 bytes (PostgreSQL's identifier limit, the smallest of the three databases)
+- a default's value is valid for its column's type
+
+## Next
+
+- [Column types](/docs/column-types): every builder and its Go/SQL type
+- [Keys, indexes and foreign keys](/docs/keys-and-indexes)
+- [Defaults](/docs/defaults): exactly when a default is used

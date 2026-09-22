@@ -1,0 +1,63 @@
+---
+title: "Client and pool options"
+description: "Options for lathe.DB: logging, using an existing pool, closing."
+section: Connect
+order: 2
+---
+
+`postgres.Open`, `mysql.Open` and `sqlite.Open` all accept the same `lathe.Option` values, and return a `*lathe.DB` that the generated `db.NewClient` wraps.
+
+## Options
+
+The one option available today is `lathe.WithLogger`, covered in full in [Logging and tracing](/docs/logging-and-tracing):
+
+```go
+conn, err := postgres.Open(dsn, lathe.WithLogger(func(ctx context.Context, e lathe.QueryEvent) {
+    slog.DebugContext(ctx, "sql", "query", e.SQL, "args", e.Args, "took", e.Duration, "err", e.Err)
+}))
+```
+
+## Using an existing pool
+
+If you already have an open `*sql.DB` — built by another part of your program, or configured with options `Open` does not expose — wrap it directly instead of calling `Open`:
+
+```go
+sqlDB, err := sql.Open("pgx", dsn)
+...
+conn := postgres.New(sqlDB)       // or mysql.New(sqlDB), sqlite.New(sqlDB)
+client := db.NewClient(conn)
+```
+
+`New` skips the connection setup `Open` does for you (see [Connecting](/docs/connecting#what-open-sets-up-for-you)), so on MySQL you are responsible for `parseTime=true` and `clientFoundRows=true` in the DSN, and on SQLite for enabling `foreign_keys` on every connection.
+
+## Connection pool
+
+`conn.SQL()` returns the underlying `*sql.DB`, so the standard pool settings apply directly:
+
+```go
+sqlDB := conn.SQL()
+sqlDB.SetMaxOpenConns(20)
+sqlDB.SetMaxIdleConns(10)
+sqlDB.SetConnMaxLifetime(30 * time.Minute)
+```
+
+## Closing
+
+```go
+defer conn.Close()
+```
+
+Every operation takes a `context.Context`, so cancellation and timeouts work the same way they do anywhere else in `database/sql`:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+user, err := client.Users.Get(ctx, id)
+```
+
+A `*lathe.DB` obtained inside a [transaction](/docs/transactions) callback cannot be closed — only the top-level connection can.
+
+## Next
+
+- [Logging and tracing](/docs/logging-and-tracing)
+- [Reading data](/docs/reading)

@@ -1,0 +1,66 @@
+---
+title: "Troubleshooting"
+description: "Common problems and their fixes."
+section: Debugging
+order: 3
+---
+
+## Setup
+
+**`no required module provides package github.com/tobibamidele/lathe`**
+lathe hasn't been added to your module yet:
+
+```bash
+go get github.com/tobibamidele/lathe@latest
+```
+
+**`lathe/postgres: no database/sql driver is registered`** (or `mysql`/`sqlite`)
+`Open` looks for a driver already registered with `database/sql` and found none. Import one for its side effect — see [Connecting](/docs/connecting#open-a-connection):
+
+```go
+import _ "github.com/jackc/pgx/v5/stdlib"
+```
+
+**`the generated code needs modules your go.mod does not list yet`**
+`lathe generate` noticed your schema uses `Decimal`/`Money` or `UUID` columns but `go.mod` is missing the matching module. It prints the exact `go get` command to run.
+
+## Generation
+
+**`With(Author) needs the column posts.author_id, which this query does not select`**
+A `Select(...)` that leaves out a foreign key column, combined with `With` on the relation that key drives. Either add the column to `Select`, or don't restrict the columns for that query.
+
+**`cannot exclude posts.author_id: it links the related rows to their parents`**
+`Exclude` on a relation tried to drop the column lathe needs to match related rows back to their parents. Exclude a different column instead.
+
+**`tables "clients" and "customers" both generate the identifier Customer; give one of them a different .Model(...)`**
+Two tables produced the same generated type name. Use `.Model("...")` on one of them — see [Defining a schema](/docs/schema#tables-and-columns).
+
+**`table "tx" would generate a Client field named Tx, which collides with a Client method; rename the table`**
+A table's name collided with a method the generated `Client` already has (`Tx`, `Exec`, `Query`, ...). Rename the table or give it `.Model("...")`.
+
+## Migrations
+
+**`20260920_add_bio was changed after it was applied (checksum mismatch); write a new migration instead`**
+A migration file was edited after `lathe migrate up` already recorded it as applied. lathe refuses to guess whether the edit should re-run — revert the edit, or write a new migration for the additional change. See [Migration workflow](/docs/migrations).
+
+**MySQL migration failed partway through**
+MySQL's DDL is not transactional, so a failed statement can leave earlier statements in the same migration already applied. The error names which statement failed — see [Per-database notes](/docs/database-notes#mysql).
+
+**Changing a primary key is refused**
+This is intentional; see [Renames and manual migrations](/docs/renames#primary-key-changes).
+
+## Queries
+
+**Timestamps fail to scan on MySQL**
+The MySQL DSN needs `parseTime=true` for `DATETIME` columns to scan into `time.Time`. `mysql.Open` adds it automatically unless you set it yourself; if you built the `*sql.DB` directly and used `mysql.New`, add it to the DSN. See [Client and pool options](/docs/client-options#using-an-existing-pool).
+
+**SQLite foreign keys don't seem to be enforced**
+`PRAGMA foreign_keys` is per connection. `sqlite.Open` sets it on every connection it opens; a `*sql.DB` you built yourself and passed to `sqlite.New` needs the pragma set the same way.
+
+**`update or delete without WHERE; call AllRows() to affect every row`**
+An `Update` or `Delete` had no `Where`. If you really mean every row, add `.AllRows()`.
+
+## Next
+
+- [Errors](/docs/errors)
+- [Logging and tracing](/docs/logging-and-tracing)

@@ -1,0 +1,26 @@
+---
+title: "Limitations and roadmap"
+description: "What lathe does not do yet."
+section: Reference
+order: 3
+---
+
+lathe is v0.1. The pipeline described in these docs — schema, codegen, migrations, queries, relations, upserts — is implemented and tested against real databases, but some things are deliberately not built yet.
+
+## Not there yet
+
+- **Nested writes** — creating a post together with its tags in one call. [Relations](/docs/relations) cover loading; writing related rows still goes through the per-table clients inside a [transaction](/docs/transactions).
+- **A per-parent limit on preloaded rows** (for example, only the 3 newest comments per post) — this needs window functions, and the right approach differs per database.
+- **A `Where` on `DO UPDATE`** for upserts ("update only if the incoming row is newer"). Plain, bulk and expression upserts are supported; see [Upserts and bulk writes](/docs/upserts).
+- **Table aliases**, so self-joins currently need [raw SQL](/docs/raw-sql).
+- **Rename detection is hint-based**, never guessed — see [Renames and manual migrations](/docs/renames).
+- **Migration snapshots are a single JSON file.** Two branches that both run `migrate diff` will conflict in `snapshot.json`; the resolution is to rebase and re-run the diff.
+
+## Tested against
+
+PostgreSQL 16, MySQL 8.0 and SQLite, each exercised through the full pipeline: schema → generate → migrate → query → migrate again over existing data → revert. `pgx` and `modernc.org/sqlite` use the same `database/sql` interfaces as the drivers used in testing (`lib/pq`, `go-sql-driver/mysql`, `mattn/go-sqlite3`) but are not themselves part of the automated runs.
+
+## Next
+
+- [Introduction](/docs/introduction)
+- lathe on [GitHub](https://github.com/tobibamidele/lathe)

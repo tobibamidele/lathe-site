@@ -1,0 +1,97 @@
+---
+title: "Reading data"
+description: "Get, FindFirst, FindMany, ordering, paging and projections."
+section: Querying
+order: 1
+---
+
+The generated client has one field per table (`client.Users`, `client.Posts`), each backed by `lathe.Model[T]`.
+
+## Get one row
+
+`Get` takes the primary key and returns `lathe.ErrNotFound` when there is no match:
+
+```go
+user, err := client.Users.Get(ctx, id)
+```
+
+A composite primary key takes several arguments, in the key's declared order:
+
+```go
+member, err := client.Members.Get(ctx, orgTenant, orgID)
+```
+
+For anything beyond an exact key match, `FindFirst().One(ctx)` does the same thing with conditions:
+
+```go
+user, err := client.Users.FindFirst().
+    Where(db.Users.Email.Eq(email), db.Users.Active.Eq(true)).
+    One(ctx)
+```
+
+`One` also returns `lathe.ErrNotFound` (which also matches `sql.ErrNoRows` through `errors.Is`) when nothing matches.
+
+## Get many rows
+
+`FindMany().All(ctx)` returns every matching row:
+
+```go
+posts, err := client.Posts.FindMany().
+    Where(db.Posts.Status.Eq(db.PostStatusPublished)).
+    OrderBy(db.Posts.Views.Desc(), db.Posts.Title.Asc()).
+    Limit(20).
+    Offset(40).
+    All(ctx)
+```
+
+Multiple arguments to `Where` are combined with `AND` — see [Conditions](/docs/conditions) for the full set of comparisons and for `Or`/`Not`. `OrderBy` takes one or more `Order` values built from a column's `.Asc()` or `.Desc()`.
+
+## Choose columns
+
+`Select` restricts a query to the given columns; `Exclude` leaves columns out. Either way, the fields you did not ask for keep their Go zero value:
+
+```go
+user, err := client.Users.FindFirst().
+    Where(db.Users.Email.Eq(email)).
+    Exclude(db.Users.PasswordHash, db.Users.APIKey).
+    One(ctx)
+
+user, err := client.Users.FindFirst().
+    Where(db.Users.ID.Eq(id)).
+    Select(db.Users.ID, db.Users.Email).
+    One(ctx)
+```
+
+Passing a column that belongs to a different table's model is an error, reported when the query runs.
+
+## Count and exists
+
+Both are available as a one-line call on the model, or chained on a query already carrying conditions:
+
+```go
+n, err := client.Users.Count(ctx, db.Users.Active.Eq(true))
+ok, err := client.Users.Exists(ctx, db.Users.Email.Eq(email))
+
+n, err = client.Posts.FindMany().Where(db.Posts.Status.Eq(db.PostStatusPublished)).Count(ctx)
+```
+
+## Loading relations
+
+`With` loads related rows (authors, comments, tags…) alongside the main query, in batches rather than one query per row. It has its own page: [Relations and preloading](/docs/relations).
+
+## See the SQL without running it
+
+Every query builder has a `Build()` that renders the statement and its bound arguments without executing anything — useful for debugging or for a test:
+
+```go
+sqlText, args, err := client.Posts.FindMany().
+    Where(db.Posts.Views.Gt(100)).
+    Limit(5).
+    Build()
+```
+
+## Next
+
+- [Conditions](/docs/conditions)
+- [Joins and aggregates](/docs/joins-and-aggregates)
+- [Relations and preloading](/docs/relations)

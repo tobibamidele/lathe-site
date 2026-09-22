@@ -1,0 +1,53 @@
+---
+title: "Raw SQL"
+description: "Escape hatches for anything the builders do not cover."
+section: Querying
+order: 8
+---
+
+Every level of lathe's query API can drop down to raw SQL rather than forcing you to route around it.
+
+## Typed results
+
+`lathe.Raw[T]` and `lathe.RawOne[T]` run a query and scan the results the same way [`Scan`/`ScanOne`](/docs/joins-and-aggregates#scanning-results) do — matched to struct fields by `db` tag or name, or into a single scalar for a one-column query:
+
+```go
+type row struct {
+    Name string
+    N    int64
+}
+rows, err := lathe.Raw[row](ctx, client.DB,
+    "SELECT name, karma FROM users WHERE active = ? ORDER BY name", true)
+
+count, err := lathe.RawOne[int64](ctx, client.DB, "SELECT count(*) FROM comments")
+```
+
+`RawOne` returns `lathe.ErrNotFound` if the query yields no row.
+
+## Statements without a typed result
+
+```go
+res, err := client.Exec(ctx, "UPDATE users SET karma = karma + ? WHERE id = ?", 1, id)
+rows, err := client.Query(ctx, "SELECT * FROM users WHERE active = ?", true)  // plain *sql.Rows
+```
+
+## Placeholders
+
+Use `?` for a bind parameter on every dialect — it is rewritten to `$1, $2, ...` for PostgreSQL — and `??` for a literal question mark (needed for things like PostgreSQL's `?` and `??` JSON operators). Placeholders inside string literals, quoted identifiers and comments are left alone, so a `?` in a comment or a quoted string is never mistaken for a parameter.
+
+## Embedding a fragment inside a builder query
+
+`lathe.SQL` does the same thing inside `Where`, `Select` and elsewhere — see [Conditions](/docs/conditions#raw-fragments):
+
+```go
+client.Users.FindMany().Where(lathe.SQL("lower(email) = ?", strings.ToLower(email)))
+```
+
+## Safety
+
+Values passed to any raw SQL helper are always bound as parameters, never interpolated into the query text. Identifiers (table and column names) are not — quote them yourself if you build one dynamically, and never construct one from untrusted input.
+
+## Next
+
+- [Conditions](/docs/conditions)
+- [Errors](/docs/errors)

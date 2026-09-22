@@ -1,0 +1,79 @@
+/* Code frame ---------------------------------------------------------- */
+.code {
+  margin: 24px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.code__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.code__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.code__copy:hover {
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+.code pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  tab-size: 4;
+}
+.code code {
+  font-family: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Token colours come from shiki inline as `--shiki-dark` / `--shiki-light` CSS
+   variables (vite.config.ts and Code.tsx both emit them), so one build serves
+   both themes. The palette is GitHub dark/light — the one place colour is allowed. */
+.code pre code span {
+  color: var(--shiki-dark);
+  background: transparent;
+}
+:root[data-theme='light'] .code pre code span {
+  color: var(--shiki-light);
+}
+
+/* Inline code --------------------------------------------------------- */
+.prose :not(pre) > code,
+.inline-code {
+  padding: 0.15em 0.4em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}

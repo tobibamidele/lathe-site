@@ -1,0 +1,86 @@
+---
+title: "Keys, indexes and foreign keys"
+description: "Primary keys, composite keys, unique and plain indexes, and references."
+section: Schema
+order: 3
+---
+
+## Primary keys
+
+Mark a single column:
+
+```go
+s.BigInt("id").PrimaryKey().AutoIncrement()
+```
+
+Or declare a composite key as a table-level item instead of marking individual columns:
+
+```go
+s.Table("post_tags",
+    s.UUID("post_id").References("posts", "id").OnDelete(s.Cascade),
+    s.Int("tag_id").References("tags", "id").OnDelete(s.Cascade),
+    s.PrimaryKey("post_id", "tag_id"),
+)
+```
+
+Use one form or the other, not both, on the same table. `AutoIncrement()` requires the column to be an integer type and the table's only primary key column.
+
+## Indexes
+
+On a single column:
+
+```go
+s.VarChar("email", 255).Unique()   // unique index
+s.BigInt("author_id").Index()      // plain index
+```
+
+Or as a table-level item, for indexes over more than one column:
+
+```go
+s.Table("posts",
+    ...
+    s.Index("author_id", "status"),
+    s.UniqueIndex("author_id", "slug"),
+)
+```
+
+Index and constraint names are generated deterministically (for example `idx_posts_author_id_status`, `uq_posts_author_id_slug`) and kept under 63 bytes, PostgreSQL's identifier limit and the smallest of the three databases. You never need to name them yourself, though `.Name("...")` on an index builder overrides the generated one.
+
+## Foreign keys
+
+On a single column, `References` is followed by the referenced table and column, optionally with the actions to take on delete or update of the referenced row:
+
+```go
+s.BigInt("author_id").References("users", "id").OnDelete(s.Cascade)
+s.BigInt("editor_id").Nullable().References("users", "id").OnDelete(s.SetNull)
+```
+
+`OnDelete` and `OnUpdate` accept `s.Cascade`, `s.Restrict`, `s.SetNull` or `s.SetDefault`. Leaving them unset uses the database's default (`NO ACTION`).
+
+For a composite foreign key, declare it as a table-level item:
+
+```go
+s.Table("members",
+    s.Int("org_tenant"),
+    s.Int("org_id"),
+    ...
+    s.ForeignKey("org_tenant", "org_id").References("orgs", "tenant", "id"),
+)
+```
+
+The referenced columns must be that table's primary key or a unique index, and their types must match — both are checked when the schema is validated.
+
+## Foreign keys become relations
+
+Every foreign key you declare is also used to generate a [relation](/docs/relations): a belongs-to field on the table that holds the key, and a has-many (or has-one, for a unique key) field on the table it references. A join table — two foreign keys whose columns together are its primary key — generates a many-to-many relation on both sides. Nothing extra needs to be written; see [Relations and preloading](/docs/relations) for how to load them.
+
+Use `.Relation("Forward", "Reverse")` on the reference to override the generated field names, `""` to keep a derived name and `"-"` to skip a side:
+
+```go
+s.BigInt("author_id").References("users", "id").Relation("Writer", "Articles")
+```
+
+## Next
+
+- [Column types](/docs/column-types)
+- [Relations and preloading](/docs/relations)

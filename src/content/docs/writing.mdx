@@ -1,0 +1,79 @@
+---
+title: "Writing data"
+description: "Create, CreateMany, Save, Update and Delete."
+section: Querying
+order: 2
+---
+
+## Create
+
+```go
+u := db.User{Email: "ann@example.com", PasswordHash: hash}
+err := client.Users.Create(ctx, &u)
+// u.ID, u.Role and u.CreatedAt are now filled in from the database.
+```
+
+Columns the database generates — an auto increment key, a `now`/UUID/expression default — are read back into the struct after the insert. Which columns count as "generated" depends on more than their `Default(...)` call; see [Defaults](/docs/defaults#when-create-leaves-a-column-out) for the exact rule.
+
+`CreateMany` inserts a slice in one transaction, batching rows into multi-row `INSERT` statements sized to the driver's parameter limit:
+
+```go
+err := client.Posts.CreateMany(ctx, posts)
+```
+
+Every row is written back the same way a single `Create` would be. If any row fails, the whole call rolls back.
+
+## Save
+
+`Save` writes every non-key column of a row you already have, matched by primary key:
+
+```go
+u.Name = "Ann Updated"
+err := client.Users.Save(ctx, &u)
+```
+
+It returns `lathe.ErrNotFound` if no row with that key exists.
+
+## Update
+
+`Update()` starts a bulk update. `Set` takes one or more assignments, built from a column:
+
+```go
+n, err := client.Posts.Update().
+    Set(lathe.Incr(db.Posts.Views, 1), db.Posts.PublishedAt.SetNull()).
+    Where(db.Posts.Status.Eq(db.PostStatusDraft)).
+    Exec(ctx)
+```
+
+| Assignment | Meaning |
+| --- | --- |
+| `col.Set(v)` | set to a Go value |
+| `col.SetNull()` | set to `NULL` |
+| `col.SetExpr(expr)` | set to an arbitrary expression |
+| `lathe.Incr(col, by)` / `lathe.Decr(col, by)` | `col = col + by` / `col = col - by`, evaluated by the database |
+
+`Exec` returns the number of matched rows. `Update` (and `Delete`, below) without a `Where` returns `lathe.ErrMissingWhere` — call `.AllRows()` to confirm you mean every row:
+
+```go
+_, err := client.Users.Update().Set(db.Users.Active.Set(false)).AllRows().Exec(ctx)
+```
+
+## Delete
+
+```go
+n, err := client.Posts.Delete().
+    Where(db.Posts.Status.Eq(db.PostStatusArchived)).
+    Exec(ctx)
+```
+
+Same `Where`-required rule as `Update`.
+
+## Upserts and transactions
+
+Inserting-or-updating on conflict is its own page: [Upserts and bulk writes](/docs/upserts). Grouping several writes so they commit or roll back together is covered in [Transactions](/docs/transactions).
+
+## Next
+
+- [Conditions](/docs/conditions)
+- [Upserts and bulk writes](/docs/upserts)
+- [Transactions](/docs/transactions)

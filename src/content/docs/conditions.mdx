@@ -1,0 +1,80 @@
+---
+title: "Conditions"
+description: "Comparison, set, pattern and boolean operators, and raw fragments."
+section: Querying
+order: 3
+---
+
+Conditions are built from a column and passed to `Where` on any query builder (`FindMany`, `Update`, `Delete`, `Select`, a [relation](/docs/relations)). Because a column is generic — `db.Users.Age` is a `lathe.Column[int32]` — comparing it against the wrong Go type is a compile error, not a runtime one.
+
+## Comparisons
+
+```go
+db.Users.Age.Eq(30)
+db.Users.Age.Ne(30)
+db.Users.Age.Gt(18)
+db.Users.Age.Gte(18)
+db.Users.Age.Lt(65)
+db.Users.Age.Lte(65)
+db.Users.Age.Between(18, 65)
+db.Users.Bio.IsNull()
+db.Users.Bio.IsNotNull()
+```
+
+## Sets
+
+```go
+db.Users.Email.In("a@x.io", "b@x.io")
+db.Users.Email.NotIn("a@x.io", "b@x.io")
+```
+
+An empty `In()` matches nothing and an empty `NotIn()` matches everything — both render as valid SQL rather than an error, so a filter built from a possibly-empty slice never needs a special case.
+
+## Patterns
+
+```go
+db.Users.Email.Like("%@x.io")
+db.Users.Email.ILike("%@X.IO")       // case-insensitive; native ILIKE on PostgreSQL,
+                                      // LOWER(...) LIKE LOWER(...) elsewhere
+db.Users.Email.Contains("50%_off")   // % and _ in the argument are escaped automatically
+db.Users.Email.HasPrefix("ann")
+db.Users.Email.HasSuffix("@x.io")
+```
+
+`Contains`, `HasPrefix` and `HasSuffix` treat their argument as a literal string — any `%` or `_` inside it is escaped, so `Contains("50%_off")` matches that exact text rather than being interpreted as wildcards. Use `Like`/`ILike` directly when you want to write the pattern yourself.
+
+## Combining conditions
+
+Multiple arguments to `Where` are combined with `AND`. `lathe.And`, `lathe.Or` and `lathe.Not` nest further:
+
+```go
+client.Users.FindMany().Where(
+    db.Users.Active.Eq(true),
+    lathe.Or(db.Users.Role.Eq(db.UserRoleAdmin), db.Users.Karma.Gt(100)),
+)
+```
+
+`lathe.And()` with no arguments is true (matches everything); `lathe.Or()` with none is false.
+
+## Column to column
+
+```go
+db.Posts.AuthorID.EqCol(db.Users.ID)
+```
+
+`EqCol`, `NeCol`, `GtCol` and `LtCol` compare two columns rather than a column and a value — used in `Join` conditions and [relations](/docs/relations).
+
+## Raw fragments
+
+`lathe.SQL` embeds a fragment with bound placeholders, for anything the builders above don't cover:
+
+```go
+client.Users.FindMany().Where(lathe.SQL("lower(email) = ?", strings.ToLower(email)))
+```
+
+Use `?` for a placeholder on every dialect — it is rewritten to `$1, $2...` for PostgreSQL — and `??` for a literal question mark. Values passed this way are always bound as parameters, never spliced into the SQL text.
+
+## Next
+
+- [Reading data](/docs/reading)
+- [Joins and aggregates](/docs/joins-and-aggregates)

@@ -1,0 +1,80 @@
+---
+title: "Relations and preloading"
+description: "Relations derived from foreign keys, loaded in batches with With."
+section: Querying
+order: 5
+---
+
+Relations come from your foreign keys — there is nothing separate to declare. Every foreign key generates a belongs-to field on the table that holds it, and the reverse (has-many, or has-one for a unique key) on the table it references. See [Keys, indexes and foreign keys](/docs/keys-and-indexes#foreign-keys-become-relations) for how the derivation and naming works.
+
+## Which relations exist
+
+| Foreign key | Generated |
+| --- | --- |
+| `posts.author_id -> users.id` | `Post.Author *User` (belongs-to) and `User.Posts []Post` (has-many) |
+| the same, but the key is unique or the primary key | `Profile.User *User` and `User.Profile *Profile` (has-one) |
+| a join table: two foreign keys to two tables that together are its primary key | `Post.Tags []Tag` and `Tag.Posts []Post` (many-to-many) |
+| several keys to one table | `Message.Sender`, `Message.Recipient`, `User.MessagesBySender`, `User.MessagesByRecipient` |
+
+## Loading with With
+
+Relation fields are `nil` until you load them. `With` loads them after the main query, in batches — one extra query per relation (two for many-to-many), regardless of how many rows came back, so there is no N+1:
+
+```go
+users, err := client.Users.FindMany().
+    Where(db.Users.Active.Eq(true)).
+    With(
+        db.Users.Profile,
+        db.Users.Posts.
+            Where(db.Posts.Status.Eq(db.PostStatusPublished)).
+            OrderBy(db.Posts.Views.Desc()).
+            Exclude(db.Posts.Cover).
+            With(
+                db.Posts.Tags.OrderBy(db.Tags.Name.Asc()),
+                db.Posts.Comments.With(db.Comments.User),
+            ),
+    ).
+    All(ctx)
+
+for _, u := range users {
+    for _, p := range u.Posts {
+        fmt.Println(u.Name, p.Title, len(p.Tags), p.Comments[0].User.Name)
+    }
+}
+```
+
+`Where`, `OrderBy` and `Exclude` on a relation filter, order and shape the related rows — the same operators as [Conditions](/docs/conditions) and [Reading data](/docs/reading). `With` on a relation nests further, to any depth.
+
+A has-many or many-to-many field for a row with no related rows is an empty, non-nil slice — "loaded, none found." A belongs-to or has-one with a `NULL` or dangling key stays `nil`.
+
+## Loading onto rows you already have
+
+```go
+u, err := client.Users.Get(ctx, id)
+err = client.Users.Load(ctx, u, db.Users.Posts)
+
+users, err := client.Users.FindMany().All(ctx)
+err = client.Users.LoadMany(ctx, users, db.Users.Posts, db.Users.Profile)
+```
+
+## Naming and overriding
+
+Names are derived from the column (`author_id` becomes `Author`) or the table. Override them with `.Relation("Forward", "Reverse")` on the reference:
+
+```go
+s.BigInt("author_id").References("users", "id").Relation("Writer", "Articles")
+```
+
+Use `""` to keep the derived name on one side and `"-"` to skip that side entirely. If a generated name collides with a column or another relation, `lathe generate` refuses with a message naming the fix.
+
+## Things to know
+
+- A relation value like `db.Users.Posts` is immutable: `.Where(...)`, `.OrderBy(...)` and `.Exclude(...)` return a modified copy, so `db.Users.Posts` itself is never changed by chaining off it.
+- The main query must select the columns a relation reads — `Select(db.Posts.Title)` combined with `With(db.Posts.Author)` is an error, since loading the author needs `author_id`.
+- `Exclude` on a relation cannot remove the column that links the related rows to their parents.
+- Relation fields serialise to JSON with `omitempty`, so an unloaded relation is simply absent rather than `null`.
+
+## Next
+
+- [Upserts and bulk writes](/docs/upserts)
+- [Keys, indexes and foreign keys](/docs/keys-and-indexes)

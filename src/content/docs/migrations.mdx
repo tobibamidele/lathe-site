@@ -1,0 +1,51 @@
+---
+title: "Migration workflow"
+description: "Generate, review, apply and revert migrations."
+section: Migrations
+order: 1
+---
+
+lathe keeps three things separate: your **schema** (the Go code), a **snapshot** of what your migration files add up to, and the **database** itself, which tracks what has actually been applied. Each command moves information between them — see [Introduction](/docs/introduction#the-three-pieces) for the full picture.
+
+## Files and the snapshot
+
+```
+migrations/
+  20260920120000_init.up.sql
+  20260920120000_init.down.sql
+  snapshot.json
+```
+
+`snapshot.json` is the schema as of the last `migrate diff` — the "before" picture the next diff compares against. It is not read from the live database, so diffs are deterministic and work offline and in CI.
+
+## Generate a migration
+
+```bash
+lathe migrate diff add_bio
+```
+
+This compares your current schema against `snapshot.json`, writes `<timestamp>_add_bio.up.sql` and `.down.sql`, and updates the snapshot. `--dry-run` prints the SQL instead of writing files, useful for reviewing a change before committing to it:
+
+```bash
+lathe migrate diff --dry-run
+```
+
+**The down migration is generated, not hand-written** — it is the up steps, inverted and run in reverse order, so the two can never drift out of sync. Destructive changes (a dropped column or table, a type change that can lose precision, `NULL` to `NOT NULL`) print a warning; review the SQL before applying it.
+
+## Apply and revert
+
+```bash
+lathe migrate up --url "$DATABASE_URL"     # apply every pending migration
+lathe migrate up --steps 1                 # apply just the next one
+lathe migrate down                         # revert the most recently applied migration
+lathe migrate down --steps 2
+lathe migrate status                       # list migrations and their state
+```
+
+The URL defaults to `$DATABASE_URL` if `--url` is omitted. Applied versions, their names and a checksum of the up file are recorded in a `lathe_migrations` table in your database, which is how `status` knows what's applied and how `up` refuses to re-run something that was edited after it was applied — see [Renames and manual migrations](/docs/renames) and [Per-database notes](/docs/database-notes) for more on how the runner behaves.
+
+## Next
+
+- [Renames and manual migrations](/docs/renames)
+- [Running migrations from your app](/docs/run-in-your-app)
+- [Per-database notes](/docs/database-notes)

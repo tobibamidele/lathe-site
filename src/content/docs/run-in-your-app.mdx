@@ -1,0 +1,55 @@
+---
+title: "Running migrations from your app"
+description: "Apply migrations at start-up with an embedded directory."
+section: Migrations
+order: 3
+---
+
+The `lathe migrate` CLI is one way to apply migrations; the `migrate` package is the same logic, callable from your program — for a start-up hook, a deploy step, or a test that needs a schema.
+
+## Embedding
+
+```go
+import (
+    "embed"
+    "io/fs"
+
+    "github.com/tobibamidele/lathe/migrate"
+)
+
+//go:embed migrations/*.sql
+var files embed.FS
+
+func run(ctx context.Context, conn *lathe.DB) error {
+    sub, err := fs.Sub(files, "migrations")
+    if err != nil {
+        return err
+    }
+    applied, err := migrate.Up(ctx, conn, sub)
+    return err
+}
+```
+
+`conn` must be a `*lathe.DB` that is not itself inside a transaction — pass the top-level connection.
+
+## migrate.Up, Down and Status
+
+```go
+applied, err := migrate.Up(ctx, conn, fsys)                 // every pending migration
+applied, err = migrate.Up(ctx, conn, fsys, migrate.WithSteps(1))
+
+reverted, err := migrate.Down(ctx, conn, fsys, 1)            // steps is required, must be >= 1
+
+states, err := migrate.Status(ctx, conn, fsys)               // one State per known migration
+```
+
+`migrate.WithLog(func(string))` receives one line per applied or reverted migration, and `migrate.WithTable("name")` overrides the bookkeeping table name if `lathe_migrations` collides with something in your schema.
+
+## Safety
+
+Applied versions are recorded with a SHA-256 checksum of their up file. If a migration is edited after it was applied, `Up` refuses to continue rather than silently skip or reapply it. Concurrent instances of your app starting at once are serialised with an advisory lock on PostgreSQL and MySQL (SQLite has a single writer, so it needs none).
+
+## Next
+
+- [Migration workflow](/docs/migrations)
+- [Per-database notes](/docs/database-notes)
