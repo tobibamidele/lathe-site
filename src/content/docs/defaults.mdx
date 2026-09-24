@@ -1,6 +1,6 @@
 ---
 title: "Defaults"
-description: "Constant, now, UUID and expression defaults, and exactly when Create uses them."
+description: "Constant, now, UUID, expression and function defaults, and exactly when Create uses them."
 section: Schema
 order: 4
 ---
@@ -14,6 +14,7 @@ s.Int("karma").Default(0)
 s.Timestamp("created_at").DefaultNow()                 // current time
 s.UUID("id").PrimaryKey().DefaultUUID()                // random UUID
 s.Text("slug").DefaultExpr("gen_random_uuid()::text")  // raw SQL, verbatim — not portable across dialects
+s.Text("id").PrimaryKey().DefaultFunc(GenerateProjectID) // calls GenerateProjectID per insert
 ```
 
 `Default(v)` accepts strings, bools, integers, floats and anything with a `String()` method (such as `decimal.Decimal`).
@@ -47,6 +48,50 @@ Default: func(m *Post) { if m.ID == uuid.Nil { m.ID = uuid.New() } }
 ```
 
 This exists because MySQL has no `RETURNING`, so a value the database generated could not be read back afterwards. Generating it in Go means the value is known immediately, on every dialect, and the column keeps its own database default for rows inserted by other tools.
+
+## Function defaults (DefaultFunc)
+
+`DefaultFunc` is the type-checked sibling of `Default`: it takes a package-level function that must return exactly the column's Go type, so a mismatched default is a compile error. `s.Text(...).DefaultFunc(GenerateProjectID)` requires `func GenerateProjectID() string`, and `s.UUID(...).DefaultFunc(GenerateID)` requires `func GenerateID() uuid.UUID`.
+
+| Column builder | `f` must return |
+| --- | --- |
+| `Text`, `VarChar`, `Enum`, `JSON` | `string` (for `JSON`, a string of valid JSON) |
+| `UUID` | `uuid.UUID` |
+| `BigInt` / `Int` | `int64` / `int32` |
+| `Bool` | `bool` |
+| `Decimal`, `Money` | `decimal.Decimal` |
+| `Timestamp`, `Date` | `time.Time` |
+| `Bytes` | `[]byte` |
+
+```go
+package schema
+
+import (
+	"github.com/google/uuid"
+	s "github.com/tobibamidele/lathe/schema"
+)
+
+// Generated code (the db package) calls GenerateProjectID on every insert while
+// the id is still empty, so it can return a fresh value each row.
+func GenerateProjectID() string { return "proj_" + uuid.NewString() }
+
+func GenerateID() uuid.UUID { id, _ := uuid.New(); return id }
+
+var Schema = s.New(s.Config{Dialect: s.Postgres, Output: "db"},
+    s.Table("projects",
+        s.Text("id").PrimaryKey().DefaultFunc(GenerateProjectID),
+        s.Text("name"),
+        s.Timestamp("created_at").DefaultNow(),
+        s.Timestamp("updated_at").DefaultNow(),
+    ),
+)
+```
+
+The function must be **exported** (`GenerateProjectID`, not `generateProjectID`) and a plain package-level function: the generated package imports your schema package and calls it by name, so closures and method values have no name to call. `Export()` reports a bad `DefaultFunc` alongside every other schema problem.
+
+Unlike `Default` and `DefaultNow`, `DefaultFunc` declares no server-side default: the column gets no `DEFAULT` clause in SQL, and a `DefaultFunc` field is always sent once the function has run. Generated code fills the field with `f()` whenever it still holds its zero value (`""` for strings, `uuid.Nil` for UUIDs, `IsZero()` for times) before the `INSERT` is built, in `Create`, `CreateMany` and `Upsert` — see [Writing data](/docs/writing). The value is known in Go on every dialect. Rows written by tools other than lathe have no database default to fall back on, so prefer `DefaultUUID()` unless you need the value produced by your own code.
+
+A column has either a server-side default or a `DefaultFunc`, whichever was called last: `Default`, `DefaultNow`, `DefaultUUID` and `DefaultExpr` clear a `DefaultFunc`, and calling `DefaultFunc` clears them.
 
 ## Next
 

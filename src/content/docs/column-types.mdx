@@ -85,7 +85,7 @@ A `nil` `lathe.JSON` stores SQL `NULL`.
 s.UUID("id").PrimaryKey().DefaultUUID()
 ```
 
-generates a `uuid.UUID` field ([`github.com/google/uuid`](https://pkg.go.dev/github.com/google/uuid)). `DefaultUUID()` fills a zero UUID with `uuid.New()` in Go before the row is inserted — see [Defaults](/docs/defaults) for why this happens client-side rather than in the database.
+generates a `uuid.UUID` field ([`github.com/google/uuid`](https://pkg.go.dev/github.com/google/uuid)). `DefaultUUID()` fills a zero UUID with `uuid.New()` in Go before the row is inserted — see [Defaults](/docs/defaults) for why this happens client-side rather than in the database. For an ID produced by your own code, give the column a `DefaultFunc` whose function returns `uuid.UUID`.
 
 ## Decimal and Money
 
