@@ -64,6 +64,22 @@ user, err := client.Users.FindFirst().
 
 Passing a column that belongs to a different table's model is an error, reported when the query runs.
 
+`Select` and `Exclude` still hand you the model struct, so the fields you left out come back zero. When you need a projection that holds *only* the requested values, use `Returning`: it changes what the query returns. Each row is a `lathe.Row` (`[]any`) with the values in the exact order you listed them, `nil` for NULL:
+
+```go
+ids, err := client.Users.FindMany().
+    Where(db.Users.Active.Eq(true)).
+    Returning(db.Users.ID, db.Users.Email). // row[0]=id, row[1]=email (nil if NULL)
+    All(ctx)                                // []lathe.Row
+
+row, err := client.Users.FindFirst().
+    Where(db.Users.Email.Eq("ann@x.io")).
+    Returning(db.Users.ID, db.Users.Email, db.Users.Bio).
+    One(ctx)                                // lathe.Row or lathe.ErrNotFound
+```
+
+Because a column you did not ask for never appears in the row, an absent ID cannot be mistaken for `uuid.Nil` or an empty email for `""`. `Returning` defines its own column list — a previous `Select` is ignored — and it cannot be combined with `With`, since relation loading needs whole rows.
+
 ## Count and exists
 
 Both are available as a one-line call on the model, or chained on a query already carrying conditions:
