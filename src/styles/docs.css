@@ -27,6 +27,9 @@
 .sidebar > .sidebar__label {
   margin-bottom: 20px;
 }
+.sidebar > .search-trigger {
+  margin-bottom: 24px;
+}
 .sidebar__group + .sidebar__group {
   margin-top: 24px;
 }
@@ -235,12 +238,18 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
   }
+  .docs-mobile__bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+  }
   .docs-mobile__toggle {
     display: flex;
     align-items: center;
+    flex: 1;
     justify-content: space-between;
-    width: 100%;
-    padding: 12px 16px;
+    padding: 12px 10px;
     border: 0;
     background: transparent;
     font-size: 14px;

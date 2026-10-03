@@ -6,6 +6,35 @@ import YAML from 'yaml'
 const VIRTUAL_ID = 'virtual:docs-meta'
 const RESOLVED_ID = '\0' + VIRTUAL_ID
 
+export interface SourceDoc {
+  slug: string
+  source: string
+  frontmatter: Record<string, unknown>
+}
+
+/**
+ * Every doc file with its frontmatter and its raw source. Shared with plugins/docs-search.ts
+ * so the metadata plugin and the search index can never disagree about what exists.
+ */
+export function readDocs(dir = 'src/content/docs'): SourceDoc[] {
+  const root = resolve(dir)
+  return readdirSync(root)
+    .filter((f) => f.endsWith('.mdx'))
+    .sort()
+    .map((file) => {
+      const source = readFileSync(join(root, file), 'utf8')
+      const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)
+      if (!match) throw new Error(`${dir}/${file}: missing YAML frontmatter`)
+      let data: unknown
+      try {
+        data = YAML.parse(match[1])
+      } catch (err) {
+        throw new Error(`${dir}/${file}: invalid frontmatter (${(err as Error).message}). Quote titles and descriptions.`)
+      }
+      return { slug: file.replace(/\.mdx$/, ''), source, frontmatter: (data ?? {}) as Record<string, unknown> }
+    })
+}
+
 /**
  * Exposes the frontmatter of every file in src/content/docs as `virtual:docs-meta`.
  *
@@ -16,24 +45,6 @@ const RESOLVED_ID = '\0' + VIRTUAL_ID
 export function docsMeta(dir = 'src/content/docs'): Plugin {
   const root = resolve(dir)
 
-  function read() {
-    return readdirSync(root)
-      .filter((f) => f.endsWith('.mdx'))
-      .sort()
-      .map((file) => {
-        const source = readFileSync(join(root, file), 'utf8')
-        const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)
-        if (!match) throw new Error(`${dir}/${file}: missing YAML frontmatter`)
-        let data: unknown
-        try {
-          data = YAML.parse(match[1])
-        } catch (err) {
-          throw new Error(`${dir}/${file}: invalid frontmatter (${(err as Error).message}). Quote titles and descriptions.`)
-        }
-        return { ...(data as object), slug: file.replace(/\.mdx$/, '') }
-      })
-  }
-
   return {
     name: 'lathe-docs-meta',
     resolveId(id) {
@@ -41,7 +52,7 @@ export function docsMeta(dir = 'src/content/docs'): Plugin {
     },
     load(id) {
       if (id !== RESOLVED_ID) return undefined
-      const docs = read()
+      const docs = readDocs(dir).map((d) => ({ ...d.frontmatter, slug: d.slug }))
       // Watch files, not the directory: adds and removals are handled in configureServer.
       for (const d of docs) this.addWatchFile(join(root, `${d.slug}.mdx`))
       return `export default ${JSON.stringify(docs)}`

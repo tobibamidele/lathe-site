@@ -34,8 +34,9 @@ For anything visual, also run `npm run screenshots` and look at the images (see 
 
 ```
 index.html                 sets data-theme before first paint (no flash); dark unless the user chose light
-vite.config.ts             MDX + highlighting pipeline, docs-meta plugin, vitest config
-plugins/docs-meta.ts       parses frontmatter of every doc into the virtual module `virtual:docs-meta`
+vite.config.ts             MDX + highlighting pipeline, docs-meta and docs-search plugins, vitest config
+plugins/docs-meta.ts       reads every doc, frontmatter + raw source; exposes `virtual:docs-meta`
+plugins/docs-search.ts     turns that source into `virtual:docs-search`: one record per heading
 src/
   main.tsx                 entry: fonts, global CSS, BrowserRouter
   App.tsx                  routes only: / , /docs , /docs/:slug , *
@@ -47,12 +48,13 @@ src/
     docs.test.ts           validates every page's frontmatter
   lib/
     docs.ts                reads metadata (virtual module) + lazily loads page bodies
+    search.ts              fuse.js over the search index, lazily imported; browse + snippets
     theme.ts, hooks.ts     useTheme, useTitle, useCopy
-  layouts/                 SiteLayout (header/footer), DocsLayout (sidebar)
+  layouts/                 SiteLayout (header/footer), DocsLayout (sidebar + search)
   pages/home/              landing page; snippets.ts holds the code shown on it
   pages/docs/              DocsIndex, DocPage, Toc ("On this page")
-  components/              Header, Footer, Code, Tabs, Callout, Logo, ThemeToggle, mdx.tsx
-  styles/                  tokens.css (all colours) + base, ui, code, layout, prose, docs, home
+  components/              Header, Footer, Code, Tabs, Callout, Logo, ThemeToggle, mdx.tsx, DocsSearch
+  styles/                  tokens.css (all colours) + base, ui, code, layout, prose, docs, search, home
 scripts/screenshots.mjs    headless visual check
 design/reference/          toris-docs.png: the reference the docs layout is modelled on
 ```
@@ -175,6 +177,14 @@ The script also fails on any browser console error.
 - **Never import an MDX module just to read its `frontmatter`.** It pulls the page body into the importing chunk and
   defeats lazy loading. Metadata comes from `virtual:docs-meta` (see `plugins/docs-meta.ts`).
 - Import local plugins with their extension in `vite.config.ts` (`./plugins/docs-meta.ts`).
+- **Heading ids in the search index must come from `github-slugger`**, the same library `rehype-slug` uses, with one
+  slugger per file so repeated headings dedupe identically. A hand-rolled slug silently breaks every `/docs/x#anchor`
+  link. `plugins/docs-search.test.ts` and the built chunk are the check.
+- The search index lives in its own virtual module and is imported **dynamically** (`src/lib/search.ts`). A static
+  import of `virtual:docs-search` would drag ~25kB gzip of page text into the main bundle.
+- The palette is portalled to `document.body` because `.sidebar` is `position: sticky` with `overflow-y: auto` and
+  would clip it. Its state lives in `DocsLayout`, not in the trigger: the sidebar renders twice, so a trigger-owned
+  listener would open two palettes on one ⌘K.
 - `<Ready>` in `DocPage` exists because the "On this page" list can only be read after the lazy MDX has rendered.
 - The active heading in `Toc` is computed from scroll position on purpose. IntersectionObserver misses jump-scrolls.
 - jsdom has no `scrollTo`, `scrollIntoView` or `IntersectionObserver`; `src/test/setup.ts` stubs what tests need.
@@ -183,7 +193,8 @@ The script also fails on any browser console error.
 ## Status and backlog
 
 **Done:** landing page, docs shell (sidebar, index, on-this-page, prev/next, edit link), dark/light theme with no flash,
-responsive layout, build-time syntax highlighting, docs validation tests, route smoke tests.
+responsive layout, build-time syntax highlighting, docs search (sidebar trigger, ⌘K palette, fuzzy search over titles,
+headings and body text, jump to a heading and land on it), docs validation tests, route smoke tests.
 
 **Written docs:** Introduction, Installation, Quickstart, Connecting.
 
@@ -192,7 +203,6 @@ Logging and tracing, Relations, then the rest.
 
 **Not built yet** (do not start without being asked):
 
-- Search (a command palette on Cmd+K, built from `virtual:docs-meta` plus page text)
 - Real logo and favicon, Open Graph image
 - Sitemap, `robots.txt`, `llms.txt`
 - Versioned docs

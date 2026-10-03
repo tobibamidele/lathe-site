@@ -84,6 +84,11 @@ Match these before inventing a new pattern.
   (arrow keys, Home/End) — keep that behaviour if you touch `Tabs.tsx`.
 - **Sidebar link / TOC link**: active state is a filled pill background (sidebar) or a left border (TOC) — never
   colour alone, so it still reads with the palette constraint.
+- **Search** (`.search-trigger`, `.search-panel`): a pill button at the top of the docs sidebar, and a palette
+  centred under the header on click or ⌘K. The scrim is `--overlay` plus a blur, the same treatment the header
+  already uses — no shadow, ever. Results are a combobox: arrows move, Enter opens, Escape closes, focus stays
+  inside. The matched run is marked with inversion (`--inverse-bg` / `--inverse-fg`), which is the only emphasis
+  available in a black and white system. A shortcut is advertised in a `<kbd>`: `--radius-sm` border, mono, 11px.
 
 ## Syntax highlighting
 
@@ -103,12 +108,18 @@ contrast after any theme or palette change.
   "on this page" column. Below `1180px` the TOC is dropped; below `860px` the sidebar collapses into a `<details>`.
 - Header is sticky, 64px, blurred translucent background. Footer is a simple bordered strip — resist growing it into
   a sitemap.
+- The search palette is a modal: it must sit above the sticky header (`z-index` 60) and go edge to edge below
+  860px, where it uses `100dvh` so the mobile browser chrome cannot clip it.
 
 ## Accessibility
 
 - Every focusable element must show `:focus-visible` (the global outline in `base.css` — don't suppress it).
 - Colour is never the only signal (see sidebar/TOC active states above).
 - Buttons and links are large enough to hit on mobile (40px minimum height).
+- A modal traps focus while it is open, returns focus to whatever opened it, and names itself (`aria-labelledby`)
+  rather than relying on a placeholder. Result lists are `role="listbox"` driven by `aria-activedescendant`, so the
+  options never enter the tab order. An icon-only control needs its own `aria-label`: its visible label cannot be
+  allowed to disappear with a media query.
 - A skip-link is present (`.skip-link`); keep it working if you change `SiteLayout`.
 
 ## Anti-patterns

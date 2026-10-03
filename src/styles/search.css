@@ -1,0 +1,211 @@
+/* Search trigger ------------------------------------------------------- */
+.search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-subtle);
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.search-trigger:hover {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+.search-trigger span {
+  flex: 1;
+}
+/* On mobile the trigger sits beside the menu button, so it shows the icon only. */
+.docs-mobile__search {
+  width: auto;
+  flex-shrink: 0;
+  padding: 0 12px;
+}
+.docs-mobile__search .search-trigger__label,
+.docs-mobile__search kbd {
+  display: none;
+}
+
+/* The keyboard hint. Same shape everywhere a shortcut is advertised. */
+.search-trigger kbd,
+.search-footer kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Palette -------------------------------------------------------------- */
+.search-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: start center;
+  padding: 12vh 16px 16px;
+  background: var(--overlay);
+  -webkit-backdrop-filter: saturate(180%) blur(6px);
+  backdrop-filter: saturate(180%) blur(6px);
+}
+.search-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(620px, 100%);
+  max-height: min(72vh, 560px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.search-field__icon {
+  flex-shrink: 0;
+  color: var(--fg-subtle);
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 16px;
+}
+.search-input::placeholder {
+  color: var(--fg-subtle);
+}
+.search-input:focus {
+  outline: none;
+}
+.search-clear {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.search-clear:hover {
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+.search-result {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: background var(--dur) var(--ease);
+}
+.search-result[aria-selected='true'] {
+  background: var(--bg-subtle);
+}
+.search-result__title {
+  color: var(--fg);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.search-result__heading {
+  color: var(--fg-subtle);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.search-result__snippet {
+  color: var(--fg-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+/* Inversion is the only emphasis available in a black and white system. */
+.search-result__snippet mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--inverse-bg);
+  color: var(--inverse-fg);
+}
+.search-empty {
+  margin: 0;
+  padding: 32px 12px;
+  color: var(--fg-subtle);
+  font-size: 14px;
+  text-align: center;
+}
+
+.search-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-subtle);
+  font-size: 12px;
+}
+.search-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.search-footer__hints {
+  gap: 16px;
+}
+
+@media (max-width: 860px) {
+  .search-scrim {
+    place-items: stretch center;
+    padding: 0;
+  }
+  .search-panel {
+    width: 100%;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+  /* No keyboard on a phone, so drop the key hints but keep the result count. */
+  .search-footer__hints {
+    display: none;
+  }
+}

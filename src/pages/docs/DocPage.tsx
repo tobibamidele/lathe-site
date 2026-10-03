@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { getDoc, getDocComponent, getNeighbors, type DocMeta } from '../../lib/docs'
 import { useTitle } from '../../lib/hooks'
 import { mdxComponents } from '../../components/mdx'
@@ -18,7 +18,23 @@ function DocView({ meta }: { meta: DocMeta }) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const [headings, setHeadings] = useState<Heading[]>([])
   const { prev, next } = getNeighbors(meta.slug)
+  const { hash } = useLocation()
   useTitle(`${meta.title} · ${site.name}`)
+
+  // ScrollToTop handles the hash on navigation, but the body is lazy: the target does not
+  // exist yet when it looks. Wait for the headings, which only arrive once MDX has rendered.
+  useEffect(() => {
+    if (!hash || headings.length === 0) return
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById(decodeURIComponent(hash.slice(1)))
+      if (!target) return
+      target.scrollIntoView()
+      // Land keyboard and screen reader users on the section too, not above it.
+      target.setAttribute('tabindex', '-1')
+      target.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [hash, headings])
 
   const collect = useCallback(() => {
     const nodes = bodyRef.current?.querySelectorAll<HTMLHeadingElement>('h2[id], h3[id]') ?? []

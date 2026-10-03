@@ -7,6 +7,7 @@ import remarkMdxFrontmatter from 'remark-mdx-frontmatter'
 import rehypeSlug from 'rehype-slug'
 import rehypeShiki from '@shikijs/rehype'
 import { docsMeta } from './plugins/docs-meta.ts'
+import { docsSearch } from './plugins/docs-search.ts'
 
 // Docs are MDX files in src/content/docs. They are compiled at build time:
 //   - frontmatter becomes a named `frontmatter` export
@@ -18,6 +19,8 @@ import { docsMeta } from './plugins/docs-meta.ts'
 export default defineConfig({
   plugins: [
     docsMeta(),
+    docsSearch(),
+
     {
       enforce: 'pre',
       ...mdx({
