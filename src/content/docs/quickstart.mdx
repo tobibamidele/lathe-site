@@ -15,6 +15,10 @@ lathe init --dialect postgres
 
 This writes `schema/schema.go` and adds `_lathe/` to `.gitignore`. Use `sqlite` or `mysql` instead of `postgres` for those databases.
 
+<Callout title="Already have SQL migrations?">
+Run `lathe import --from migrations` instead of `lathe init`. It rebuilds the schema from your existing files so you can skip the manual translation. See [Importing existing migrations](/docs/importing-migrations).
+</Callout>
+
 ## 2. Describe your tables
 
 The schema is ordinary Go, so you get autocomplete and compile errors. Edit `schema/schema.go`:

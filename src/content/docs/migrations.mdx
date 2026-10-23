@@ -44,8 +44,21 @@ lathe migrate status                       # list migrations and their state
 
 The URL defaults to `$DATABASE_URL` if `--url` is omitted. Applied versions, their names and a checksum of the up file are recorded in a `lathe_migrations` table in your database, which is how `status` knows what's applied and how `up` refuses to re-run something that was edited after it was applied — see [Renames and manual migrations](/docs/renames) and [Per-database notes](/docs/database-notes) for more on how the runner behaves.
 
+## Adopting an existing database
+
+If the project already has SQL migrations, you do not need to rewrite the schema by hand. `lathe import` replays the files and writes `schema/schema.go` from the result:
+
+```bash
+lathe import --from migrations --dialect postgres
+lathe generate
+lathe migrate snapshot
+```
+
+`migrate snapshot` records the imported schema so the next `migrate diff` starts from the current shape. Importing does not mark the old files as applied in `lathe_migrations`, so do not run `migrate up` against a database that already has them. See [Importing existing migrations](/docs/importing-migrations).
+
 ## Next
 
+- [Importing existing migrations](/docs/importing-migrations)
 - [Renames and manual migrations](/docs/renames)
 - [Running migrations from your app](/docs/run-in-your-app)
 - [Per-database notes](/docs/database-notes)

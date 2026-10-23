@@ -1,0 +1,72 @@
+---
+title: "Importing existing migrations"
+description: "Rebuild a lathe schema from a directory of SQL migrations."
+section: Migrations
+order: 3
+---
+
+If the database already has a history of SQL migrations, `lathe import` reconstructs the schema from those files so you do not have to translate them into Go by hand. It reads the migrations; it does not touch the database.
+
+## Run the import
+
+```bash
+lathe import --from migrations --dialect postgres
+lathe generate
+lathe migrate snapshot
+```
+
+The import writes `schema/schema.go`, `generate` turns it into the `db` package, and `migrate snapshot` records the imported shape as the starting point for future diffs.
+
+The defaults are `--schema schema`, `--output db`, `--migrations migrations` and `--dialect postgres`. Point them elsewhere when your project uses different directories:
+
+```bash
+lathe import --from prisma/migrations --dialect postgres \
+    --schema internal/schema --output internal/db
+```
+
+`--dry-run` prints the generated schema instead of writing it. `--force` replaces an existing `schema/schema.go`; without it, the command refuses to overwrite one.
+
+## File order
+
+Migrations are applied in file-name order, using the leading number when a file or directory has one (`001_init.sql`, `20260920120000_init/`). Later statements win, so the result is the schema as it exists after the last migration. If `001_init.sql` creates a table and `019_cleanup.sql` drops it, the table is absent; a rename or `ALTER TABLE` in a later file overrides the earlier definition.
+
+Nested directories are scanned, which covers Prisma and Drizzle layouts. Down migrations — `.down.sql`, `_down.sql`, `-down.sql`, `.rollback.sql` and `.revert.sql` — are ignored, as are hidden directories, `node_modules` and `meta`.
+
+## What it reads
+
+| SQL | Result |
+| --- | --- |
+| `CREATE TABLE` | Columns, types, defaults, nullability, primary keys, unique constraints and foreign keys |
+| `ALTER TABLE` | Added, dropped, renamed and retyped columns, defaults, keys and constraints |
+| `CREATE INDEX` / `DROP INDEX` | Plain btree indexes, including unique indexes |
+| `CREATE TYPE`, `ALTER TYPE`, `DROP TYPE` | Enum values, including `CREATE TYPE` inside a `DO $$ ... $$` block |
+| `SERIAL`, `BIGSERIAL`, identity, `AUTOINCREMENT` | Integer keys with `AutoIncrement` |
+
+Anything lathe cannot express is skipped with a warning instead of failing the import: `CHECK` constraints, partial, expression and GIN indexes, arrays (imported as JSON), and MySQL's `ON UPDATE CURRENT_TIMESTAMP`. Views, triggers, functions and extensions are ignored because they do not change the tables lathe models.
+
+## Warnings and strict mode
+
+```text
+warning: 001_init.up.sql (statement 14): table "products" column "price": CHECK constraint is not supported by lathe; ignored
+warning: 014_add_product_tags.up.sql (statement 1): table "products" column "tags": array type; imported as json
+```
+
+Each warning names the file and statement. Review them before using the result. Pass `--strict` to turn any warning into an error; the command exits before writing `schema/schema.go`.
+
+## Review the schema
+
+The generated file is ordinary lathe schema code, so edit it where the SQL does not carry enough information:
+
+- Every table needs a primary key. The importer warns when one is missing, and `lathe generate` will not accept the schema until you add one.
+- Constraint names are derived from table and column names. If a later migration drops a database-generated constraint by name, the importer may not match it and reports a warning.
+- A foreign key is kept only when it points at a primary key or unique index, matching what lathe can represent.
+
+## An existing database
+
+Importing reconstructs the schema; it does not mark the old migration files as applied in `lathe_migrations`. If the database already has those migrations, do not run `lathe migrate up` against it again. Use `lathe migrate snapshot` so future diffs start from the current shape, then write only new migrations with `lathe migrate diff`.
+
+## Next
+
+- [Migration workflow](/docs/migrations)
+- [Renames and manual migrations](/docs/renames)
+- [CLI reference](/docs/cli)

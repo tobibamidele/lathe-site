@@ -23,6 +23,15 @@ lathe generate [--schema DIR]
 
 Generates the Go package (models, typed columns, client) from the schema. Only rewrites files whose content actually changed, and removes generated files for tables that no longer exist.
 
+## lathe import
+
+```bash
+lathe import --from DIR [--schema DIR] [--dialect postgres|mysql|sqlite] \
+    [--output DIR] [--migrations DIR] [--strict] [--dry-run] [--force]
+```
+
+Rebuilds `schema/schema.go` from a directory of SQL migrations, applied in file-name order. `--strict` fails when a migration uses a construct lathe cannot represent, `--dry-run` prints the generated schema instead of writing it, and `--force` replaces an existing `schema/schema.go`. See [Importing existing migrations](/docs/importing-migrations).
+
 ## lathe migrate diff
 
 ```bash
